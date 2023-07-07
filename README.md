@@ -51,13 +51,3 @@ Endpoints to use:
       }
     }
     ```
-
-
- * POST /unsubscribe: unsubscribe event </br>
-   Body:
-   ```sh
-   {
-    "eventType": "unsubscribe",
-    "name":"machine 1"
-    }
-    ```
