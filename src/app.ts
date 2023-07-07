@@ -1,8 +1,10 @@
-import { Subscriber } from "./event/subcribers";
-import { EventType, Machine } from "./event/event.interface";
 import express, { Request, Response } from "express";
-import { PublishSubscribeService } from "./event";
 import bodyParser from "body-parser";
+import { MachineRepository } from "./event/repository";
+import { PublishSubscribeService } from "./event/service";
+import { Machine } from "./event/machine";
+import { MachineRefillSubscriber, MachineSaleSubscriber, StockWarningSubscriber } from "./event/subcribers";
+import { MachineRefillEvent, MachineSaleEvent } from "./event/event.interface";
 const app = express();
 app.use(bodyParser.json());
 
@@ -12,57 +14,51 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-export const sharedArrayMachine: Machine[] = [
-  { id: 1, name: "Machine 1", quantity: 100 },
-  { id: 2, name: "Machine 2", quantity: 50 },
-]; // Shared array of mach  ines
-
+// Usage example
+const machineRepository = new MachineRepository();
 const publishSubscribeService = new PublishSubscribeService();
 
-const subscriber1 = new Subscriber("machine 1");
-const subscriber2 = new Subscriber("machine 2");
+// Create machines
+const machine1 = new Machine(1, 'Machine 1', 5);
+const machine2 = new Machine(2, 'Machine 2', 2);
+const machine3 = new Machine(3, 'Machine 3', 4);
 
-publishSubscribeService.subscribe(
-  EventType.LOW_STOCK_WARNING_EVENT,
-  subscriber1
-);
-publishSubscribeService.subscribe(
-  EventType.LOW_STOCK_WARNING_EVENT,
-  subscriber2
-);
-publishSubscribeService.subscribe(EventType.STOCK_LEVEL_OK_EVENT, subscriber1);
-publishSubscribeService.subscribe(EventType.STOCK_LEVEL_OK_EVENT, subscriber2);
+// Store machines in repository
+machineRepository.add(machine1);
+machineRepository.add(machine2);
+machineRepository.add(machine3);
+// Create subscribers
+const machineRefillSubscriber = new MachineRefillSubscriber(machineRepository);
+const machineSaleSubscriber = new MachineSaleSubscriber(machineRepository);
+const stockWarningSubscriber = new StockWarningSubscriber(machineRepository, publishSubscribeService);
 
-app.get("/machine", (req: Request, res: Response) => {
-  res.json({ machine: sharedArrayMachine });
-});
+// Subscribe subscribers to the service
+publishSubscribeService.subscribe(machineRefillSubscriber);
+publishSubscribeService.subscribe(machineSaleSubscriber);
+publishSubscribeService.subscribe(stockWarningSubscriber);
+// publishSubscribeService.unsubscribe(stockWarningSubscriber);
 
-app.post("/trigger-event-sale", (req: Request, res: Response) => {
-  const { machine, eventType, name } = req.body;
+app.get('/machine', (req: Request, res: Response) => {
+  res.json({ machine: machineRepository.getAll() })
+})
 
-  publishSubscribeService.publish(eventType, { subscriberName: name, machine });
+app.post('/refill', (req: Request, res: Response) => {
+  const { machineId, quantity } = req.body;
+  const machineSale = machineRepository.getById(machineId).getValue();
+  const refillEvent = new MachineRefillEvent(machineSale, quantity);
 
-  res.status(200).json({ message: "Event triggered successfully" });
-});
+  publishSubscribeService.publish(refillEvent);
+  res.json({ machine: machineSale })
+})
 
-app.post("/trigger-event-refill", (req: Request, res: Response) => {
-  const { machine, eventType, name } = req.body;
+app.post('/sale', (req: Request, res: Response) => {
+  const { machineId, quantity } = req.body;
+  const machineSale = machineRepository.getById(machineId).getValue();
+  const saleEvent = new MachineSaleEvent(machineSale, quantity);
 
-  publishSubscribeService.publish(eventType, { subscriberName: name, machine });
-
-  res.status(200).json({ message: "Event refill quantity successfully" });
-});
-
-app.post("/unsubscribe", (req: Request, res: Response) => {
-  const { eventType, name } = req.body;
-  publishSubscribeService.unsubscribe(eventType, name);
-
-  res
-    .status(200)
-    .json({
-      message: `Event unsubscribe ${name} from ${eventType} successfully`,
-    });
-});
+  publishSubscribeService.publish(saleEvent);
+  res.json({ machine: machineSale })
+})
 
 app.listen(port, () => {
   return console.log(`Express is listening at http://localhost:${port}`);
