@@ -10,16 +10,7 @@
 ### Built With
     
 * ExpressJS
-* Redis
 
-### Prerequisites
-
-This is an example of how to list things you need to use the software and how to install them.
-* Redis
-  ```sh
-  docker run -d --restart unless-stopped -p 6379:6379  --name redisLocal  redis
-  ```
-  
 <!-- USAGE EXAMPLES -->
 ## Usage
 
